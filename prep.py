@@ -22,9 +22,13 @@ from pyspark import SparkConf, SparkContext
 from pyspark.mllib.recommendation import ALS, MatrixFactorizationModel
 
 
-def hashUser(userId):
-    return (userId, abs(hash(userId)))
+def hashUser(line):
+    fields = line.strip().split("\t")
+    return hash(fields[0])
 
+def hashSongs(val):
+    fields = val.strip().split("\t")
+    return (fields[1], hash(fields[1]), fields[2], fields[0])
 
 conf = SparkConf() \
       .setAppName("Music Recommender") \
@@ -33,8 +37,9 @@ conf = SparkConf() \
 sc = SparkContext(conf=conf)
 
 
-tastes = sc.textFile('./datasets/train_triplets.txt')
-userIds = sc.textFile('./datasets/train_triplets.txt').map(lambda x: x[0]).distinct().map(hashUser)
+ 
+# userIds = sc.textFile('./datasets/train_triplets.txt').map(lambda x: x[0]).distinct().map(hashUser)
+outputRDD = sc.textFile('./datasets/subset.txt').keyBy(hashUser).mapValues(hashSongs)
 
 
-tastes.join(userIds).saveAsTextFile("./datasets/user_tastes")
+outputRDD.coalesce(1).saveAsTextFile("./datasets/sub_user_tastes")
