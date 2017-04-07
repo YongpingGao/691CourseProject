@@ -34,21 +34,21 @@ def parseSong(line):
     fields = line.strip().split("<SEP>")
     return (fields[1], fields[3])
 
-def loadRatings(ratingsFile):
-    """
-    Load ratings from file.
-    """
-    if not isfile(ratingsFile):
-        print("File {0} does not exist.".format(ratingsFile))
-        sys.exit(1)
-    f = open(ratingsFile, 'r')
-    ratings = filter(lambda r: r[2] > 0, [parseRating(line)[1] for line in f])
-    f.close()
-    if not ratings:
-        print("No ratings provided.")
-        sys.exit(1)
-    else:
-        return ratings
+# def loadRatings(ratingsFile):
+#     """
+#     Load ratings from file.
+#     """
+#     if not isfile(ratingsFile):
+#         print("File {0} does not exist.".format(ratingsFile))
+#         sys.exit(1)
+#     f = open(ratingsFile, 'r')
+#     ratings = filter(lambda r: r[2] > 0, [parseRating(line)[1] for line in f])
+#     f.close()
+#     if not ratings:
+#         print("No ratings provided.")
+#         sys.exit(1)
+#     else:
+#         return ratings
 
 def computeRmse(model, data, n):
     """
@@ -99,48 +99,52 @@ if __name__ == "__main__":
    
    
     # numPartitions = 4
-    # training = ratings.filter(lambda x: x[0] < 6).values().union(myRatingsRDD).repartition(numPartitions).cache()
+    (training, validation, test) = ratings.randomSplit([0.6, 0.2, 0.2])
+    # training = ratings.filter(lambda x: x[0] < 6).repartition(numPartitions).cache()
     # validation = ratings.filter(lambda x: x[0] >= 6 and x[0] < 8).values().repartition(numPartitions).cache()
     # test = ratings.filter(lambda x: x[0] >= 8).values().cache()
 
-    # numTraining = training.count()
-    # numValidation = validation.count()
-    # numTest = test.count()
+    numTraining = training.count()
+    numValidation = validation.count()
+    numTest = test.count()
 
-    # print("Training: {0}, validation: {1}, test: {2}".format(numTraining, numValidation, numTest))
-    # print("------------------------------------------------------------------------------------------")
-    # ranks = [8, 12]
-    # lambdas = [0.1, 10.0]
-    # numIters = [10, 20]
-    # bestModel = None
-    # bestValidationRmse = float("inf")
-    # bestRank = 0
-    # bestLambda = -1.0
-    # bestNumIter = -1
+    print("Training: {0}, validation: {1}, test: {2}".format(numTraining, numValidation, numTest))
+    print("------------------------------------------------------------------------------------------")
+    
+    
+    ranks = [8, 12]
+    lambdas = [0.1, 10.0]
+    numIters = [10, 20]
+    alphas = [0.01, 1]
+    bestModel = None
+    bestValidationRmse = float("inf")
+    bestRank = 0
+    bestLambda = -1.0
+    bestNumIter = -1
 
-    # for rank, lmbda, numIter in itertools.product(ranks, lambdas, numIters):
-    #     model = ALS.train(training, rank, numIter, lmbda)
-    #     validationRmse = computeRmse(model, validation, numValidation)
-    #     print("RMSE (validation) = {0:f} for the model trained with rank = {1:d}, lambda = {2:.1f}, and numIter = {3:d}.".format(validationRmse, rank, lmbda, numIter))
-    #     if (validationRmse < bestValidationRmse):
-    #         bestModel = model
-    #         bestValidationRmse = validationRmse
-    #         bestRank = rank
-    #         bestLambda = lmbda
-    #         bestNumIter = numIter
+    for rank, lmbda, numIter, alpha in itertools.product(ranks, lambdas, numIters, alphas):
+        model = ALS.trainImplicit(training, rank, numIter, lmbda, alpha)
+        validationRmse = computeRmse(model, validation, numValidation)
+        print("RMSE (validation) = {0:f} for the model trained with rank = {1:d}, lambda = {2:.1f}, and numIter = {3:d}.".format(validationRmse, rank, lmbda, numIter))
+        if (validationRmse < bestValidationRmse):
+            bestModel = model
+            bestValidationRmse = validationRmse
+            bestRank = rank
+            bestLambda = lmbda
+            bestNumIter = numIter
 
-    # testRmse = computeRmse(bestModel, test, numTest)
+    testRmse = computeRmse(bestModel, test, numTest)
 
-    # # evaluate the best model on the test set
-    # print("The best model was trained with rank = {0:d} and lambda = {1:.1f}, and numIter = {2:d}, and its RMSE on the test set is {3:f}.".format(bestRank, bestLambda, bestNumIter, testRmse))
+    # evaluate the best model on the test set
+    print("The best model was trained with rank = {0:d} and lambda = {1:.1f}, and numIter = {2:d}, and its RMSE on the test set is {3:f}.".format(bestRank, bestLambda, bestNumIter, testRmse))
 
-    # # compare the best model with a naive baseline that always returns the mean rating
-    # meanRating = training.union(validation).map(lambda x: x[2]).mean()
-    # baselineRmse = sqrt(test.map(lambda x: (meanRating - x[2]) ** 2).reduce(add) / numTest)
-    # improvement = (baselineRmse - testRmse) / baselineRmse * 100
-    # print("The best model improves the baseline by {0:.2f}%.".format(improvement))
+    # compare the best model with a naive baseline that always returns the mean rating
+    meanRating = training.union(validation).map(lambda x: x[2]).mean()
+    baselineRmse = sqrt(test.map(lambda x: (meanRating - x[2]) ** 2).reduce(add) / numTest)
+    improvement = (baselineRmse - testRmse) / baselineRmse * 100
+    print("The best model improves the baseline by {0:.2f}%.".format(improvement))
 
-    # # make personalized recommendations
+    # make personalized recommendations
 
     # myRatedMovieIds = set([x[1] for x in myRatings])
     # candidates = sc.parallelize([m for m in movies if m not in myRatedMovieIds])
@@ -156,4 +160,4 @@ if __name__ == "__main__":
 
     stop = timeit.default_timer()
 
-    print("Time elaps: {0}".format(stop - start))
+    print("Time elaps: {0} seconds".format(stop - start))
