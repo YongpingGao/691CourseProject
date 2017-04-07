@@ -13,18 +13,21 @@
 import sys
 import timeit
 import itertools
+import hashlib
 from math import sqrt
 from operator import add
 from os.path import join, isfile, dirname
 
 from pyspark import SparkConf, SparkContext
-from pyspark.mllib.recommendation import ALS
+from pyspark.mllib.recommendation import ALS, MatrixFactorizationModel
+ 
 
 def parseRating(line):
     """
     Parses a listening count record in musicData format: userId <tab> songId <tab> count
     """
-    fields = line.strip().split('\t')
+    fields = line.split(",")
+
     return (fields[0], fields[1], int(fields[2]))
 
 def parseSong(line):
@@ -81,13 +84,13 @@ if __name__ == "__main__":
 
     musicDataDir = sys.argv[1]
 
-    # ratings is an RDD of (userId, songId, count)
-    ratings = sc.textFile(join(musicDataDir, "train_triplets.txt")).map(parseRating)
-
+    # ratings is an RDD of ((userId,id), songId, count))
+    ratings = sc.textFile(join(musicDataDir, "train_triplets.txt")).map(parseRating).map(lambda x: (x[0], x[1], x[2]))
+    
     # movies is an RDD of (songId, songTitle)
     songs = dict(sc.textFile(join(musicDataDir, "unique_tracks.txt")).map(parseSong).collect())
 
-
+    # print(ratings.collect())
     numRatings = ratings.count()
     numUsers = ratings.map(lambda r: r[0]).distinct().count()
     numSongs = ratings.map(lambda r: r[1]).distinct().count()
@@ -98,51 +101,58 @@ if __name__ == "__main__":
    
    
    
-    # numPartitions = 4
-    (training, validation, test) = ratings.randomSplit([0.6, 0.2, 0.2])
-    # training = ratings.filter(lambda x: x[0] < 6).repartition(numPartitions).cache()
-    # validation = ratings.filter(lambda x: x[0] >= 6 and x[0] < 8).values().repartition(numPartitions).cache()
-    # test = ratings.filter(lambda x: x[0] >= 8).values().cache()
+    # # numPartitions = 4
+    # (training, validation, test) = ratings.randomSplit([0.6, 0.2, 0.2])
+    # # training = ratings.filter(lambda x: x[0] < 6).repartition(numPartitions).cache()
+    # # validation = ratings.filter(lambda x: x[0] >= 6 and x[0] < 8).values().repartition(numPartitions).cache()
+    # # test = ratings.filter(lambda x: x[0] >= 8).values().cache()
 
-    numTraining = training.count()
-    numValidation = validation.count()
-    numTest = test.count()
+    # numTraining = training.count()
+    # numValidation = validation.count()
+    # numTest = test.count()
 
-    print("Training: {0}, validation: {1}, test: {2}".format(numTraining, numValidation, numTest))
-    print("------------------------------------------------------------------------------------------")
+    # print("Training: {0}, validation: {1}, test: {2}".format(numTraining, numValidation, numTest))
+    # print("------------------------------------------------------------------------------------------")
     
     
-    ranks = [8, 12]
-    lambdas = [0.1, 10.0]
-    numIters = [10, 20]
-    alphas = [0.01, 1]
-    bestModel = None
-    bestValidationRmse = float("inf")
-    bestRank = 0
-    bestLambda = -1.0
-    bestNumIter = -1
+    # ranks = [8, 12]
+    # lambdas = [0.1, 10.0]
+    # numIters = [10, 20]
+    # alphas = [0.01, 1]
+    # bestModel = None
+    # bestValidationRmse = float("inf")
+    # bestRank = 0
+    # bestLambda = -1.0
+    # bestNumIter = -1
 
-    for rank, lmbda, numIter, alpha in itertools.product(ranks, lambdas, numIters, alphas):
-        model = ALS.trainImplicit(training, rank, numIter, lmbda, alpha)
-        validationRmse = computeRmse(model, validation, numValidation)
-        print("RMSE (validation) = {0:f} for the model trained with rank = {1:d}, lambda = {2:.1f}, and numIter = {3:d}.".format(validationRmse, rank, lmbda, numIter))
-        if (validationRmse < bestValidationRmse):
-            bestModel = model
-            bestValidationRmse = validationRmse
-            bestRank = rank
-            bestLambda = lmbda
-            bestNumIter = numIter
+    # for rank, lmbda, numIter, alpha in itertools.product(ranks, lambdas, numIters, alphas):
+    #     # Build model
+    #     model = ALS.trainImplicit(training, rank, numIter, lmbda, alpha=alpha)
+    #     validationRmse = computeRmse(model, validation, numValidation)
+    #     print("RMSE (validation) = {0:f} for the model trained with rank = {1:d}, lambda = {2:.1f}, and numIter = {3:d}.".format(validationRmse, rank, lmbda, numIter))
+    #     if (validationRmse < bestValidationRmse):
+    #         bestModel = model
+    #         bestValidationRmse = validationRmse
+    #         bestRank = rank
+    #         bestLambda = lmbda
+    #         bestNumIter = numIter
 
-    testRmse = computeRmse(bestModel, test, numTest)
+    # testRmse = computeRmse(bestModel, test, numTest)
 
-    # evaluate the best model on the test set
-    print("The best model was trained with rank = {0:d} and lambda = {1:.1f}, and numIter = {2:d}, and its RMSE on the test set is {3:f}.".format(bestRank, bestLambda, bestNumIter, testRmse))
+    # # evaluate the best model on the test set
+    # print("The best model was trained with rank = {0:d} and lambda = {1:.1f}, and numIter = {2:d}, and its RMSE on the test set is {3:f}.".format(bestRank, bestLambda, bestNumIter, testRmse))
 
-    # compare the best model with a naive baseline that always returns the mean rating
-    meanRating = training.union(validation).map(lambda x: x[2]).mean()
-    baselineRmse = sqrt(test.map(lambda x: (meanRating - x[2]) ** 2).reduce(add) / numTest)
-    improvement = (baselineRmse - testRmse) / baselineRmse * 100
-    print("The best model improves the baseline by {0:.2f}%.".format(improvement))
+    # # compare the best model with a naive baseline that always returns the mean rating
+    # meanRating = training.union(validation).map(lambda x: x[2]).mean()
+    # baselineRmse = sqrt(test.map(lambda x: (meanRating - x[2]) ** 2).reduce(add) / numTest)
+    # improvement = (baselineRmse - testRmse) / baselineRmse * 100
+    # print("The best model improves the baseline by {0:.2f}%.".format(improvement))
+
+
+    # # Save and load model
+    # modelDir = "./MusicRecommenderModel"
+    # bestModel.save(sc, modelDir)
+    # print("Best model is saved to {0}".format(modelDir))
 
     # make personalized recommendations
 
