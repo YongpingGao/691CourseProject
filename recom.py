@@ -21,20 +21,22 @@ from os.path import join, isfile, dirname
 from pyspark import SparkConf, SparkContext
 from pyspark.mllib.recommendation import ALS, MatrixFactorizationModel
  
-# (1024730767121240381, ('SOJQOIK12AF72A0AAF', 1175004632238429755, '5', '8937134734f869debcab8f23d77465b4caaa85df'))
-# (userid_update, (songid, songid_update, count, userid))
+# ((userId, userOldId, songOldId, count), songId)
+# ((0, 'b80344d063b5ccb3212f76538f3d9e43d87dca9e,SODDNQT12A6D4F5F7E,3'), 0), 
+# 0,b80344d063b5ccb3212f76538f3d9e43d87dca9e,SODDNQT12A6D4F5F7E,3,0, 
 def parseRating(line):
     """
     Parses a listening count record in musicData format: userId <tab> songId <tab> count
     """
     line = line.replace('(', '').replace(')', '').replace(' ', '').replace('\'', '').split(',')
-    # line[3] = line[3].replace('\'', '')
-    print("HAHHHAHAHAHHAH")
-    print("0--------->" + line[0])
-    print("2--------->" + line[2])
-    print("3--------->" + line[3])
     # userid, songid, count
-    return (line[0], line[2], int(line[3]))
+    print("useriduseriduseriduseriduseriduserid")
+    print(int(line[0]))
+    print("songidsongidsongidsongidsongidsongid")
+    print(int(line[4]))
+    print("countcountcountcountcount")
+    print(int(line[3]))
+    return (int(line[0]), int(line[4]), int(line[3]))
 
 def parseSong(line):
     """
@@ -64,12 +66,10 @@ def computeRmse(model, data, n):
     Compute RMSE (Root Mean Squared Error).
     """
     predictions = model.predictAll(data.map(lambda x: (x[0], x[1])))
-    print("XXXXXXX")
+    print("predictionspredictionspredictionspredictionspredictionspredictions")
     print(predictions.collect())
-    print("YYYYYYYY")
+    print("datadatadatadatadatadatadatadatadatadatadatadatadatadata")
     print(data.collect())
-    # userid, songid, count
-
     predictionsAndRatings = predictions.map(lambda x: ((x[0], x[1]), x[2])).join(data.map(lambda x: ((x[0], x[1]), x[2]))).values()
 
     return sqrt(predictionsAndRatings.map(lambda x: (x[0] - x[1]) ** 2).reduce(add) / float(n))
@@ -101,20 +101,21 @@ if __name__ == "__main__":
     musicDataDir = sys.argv[1]
 
     # ratings is an RDD of ((userId,id), songId, count))
-    # ratings = sc.textFile(join(musicDataDir, "user_tastes/part-00000")).map(parseRating)
-    ratings = sc.textFile(join(musicDataDir, "user_tastes/sub")).map(parseRating)
+    ratings = sc.textFile(join(musicDataDir, "user_tastes/rating_data/part-00000")).map(parseRating)
+
+    # ratings = sc.textFile(join(musicDataDir, "user_tastes/sub")).map(parseRating)
     # print(ratings.collect())
     # movies is an RDD of (songId, songTitle)
     # songs = dict(sc.textFile(join(musicDataDir, "unique_tracks.txt")).map(parseSong).collect())
 
     # print(ratings.collect())
-    # numRatings = ratings.count()
-    # numUsers = ratings.map(lambda r: r[0]).distinct().count()
-    # numSongs = ratings.map(lambda r: r[1]).distinct().count()
+    numRatings = ratings.count()
+    numUsers = ratings.map(lambda r: r[0]).distinct().count()
+    numSongs = ratings.map(lambda r: r[1]).distinct().count()
 
 
-    # print ("Got {0} ratings from {1} users on {2} songs.".format(numRatings, numUsers, numSongs))
-    # print("------------------------------------------------------------------------------------------")
+    print ("Got {0} ratings from {1} users on {2} songs.".format(numRatings, numUsers, numSongs))
+    print("------------------------------------------------------------------------------------------")
    
    
    
