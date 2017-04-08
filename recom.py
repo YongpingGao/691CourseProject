@@ -27,10 +27,14 @@ def parseRating(line):
     """
     Parses a listening count record in musicData format: userId <tab> songId <tab> count
     """
-    userid_update = line[0]
-    fields = line[1].split(",")
+    line = line.replace('(', '').replace(')', '').replace(' ', '').replace('\'', '').split(',')
+    # line[3] = line[3].replace('\'', '')
+    print("HAHHHAHAHAHHAH")
+    print("0--------->" + line[0])
+    print("2--------->" + line[2])
+    print("3--------->" + line[3])
     # userid, songid, count
-    return (userid_update, fields[1], int(fields[2]))
+    return (line[0], line[2], int(line[3]))
 
 def parseSong(line):
     """
@@ -60,7 +64,14 @@ def computeRmse(model, data, n):
     Compute RMSE (Root Mean Squared Error).
     """
     predictions = model.predictAll(data.map(lambda x: (x[0], x[1])))
+    print("XXXXXXX")
+    print(predictions.collect())
+    print("YYYYYYYY")
+    print(data.collect())
+    # userid, songid, count
+
     predictionsAndRatings = predictions.map(lambda x: ((x[0], x[1]), x[2])).join(data.map(lambda x: ((x[0], x[1]), x[2]))).values()
+
     return sqrt(predictionsAndRatings.map(lambda x: (x[0] - x[1]) ** 2).reduce(add) / float(n))
 
 if __name__ == "__main__":
@@ -73,10 +84,13 @@ if __name__ == "__main__":
 
     start = timeit.default_timer()
 
+   
+
     conf = SparkConf() \
       .setAppName("Music Recommender") \
-      .set("spark.executor.memory", "2g")
-    sc = SparkContext(conf=conf)
+      .set("spark.executor.memory", "4g") \
+      .set("spark.executor.heartbeatInterval","3600s")
+    sc = SparkContext('local[4]', '', conf=conf)
 
     # load personal ratings
     # myRatings = loadRatings(sys.argv[2])
@@ -87,19 +101,20 @@ if __name__ == "__main__":
     musicDataDir = sys.argv[1]
 
     # ratings is an RDD of ((userId,id), songId, count))
-    ratings = sc.textFile(join(musicDataDir, "user_tastes/part-00000")).map(parseRating)
-    
+    # ratings = sc.textFile(join(musicDataDir, "user_tastes/part-00000")).map(parseRating)
+    ratings = sc.textFile(join(musicDataDir, "user_tastes/sub")).map(parseRating)
+    # print(ratings.collect())
     # movies is an RDD of (songId, songTitle)
     # songs = dict(sc.textFile(join(musicDataDir, "unique_tracks.txt")).map(parseSong).collect())
 
     # print(ratings.collect())
-    numRatings = ratings.count()
-    numUsers = ratings.map(lambda r: r[0]).distinct().count()
-    numSongs = ratings.map(lambda r: r[1]).distinct().count()
+    # numRatings = ratings.count()
+    # numUsers = ratings.map(lambda r: r[0]).distinct().count()
+    # numSongs = ratings.map(lambda r: r[1]).distinct().count()
 
 
-    print ("Got {0} ratings from {1} users on {2} songs.".format(numRatings, numUsers, numSongs))
-    print("------------------------------------------------------------------------------------------")
+    # print ("Got {0} ratings from {1} users on {2} songs.".format(numRatings, numUsers, numSongs))
+    # print("------------------------------------------------------------------------------------------")
    
    
    
@@ -127,28 +142,31 @@ if __name__ == "__main__":
     bestLambda = -1.0
     bestNumIter = -1
 
-    for rank, lmbda, numIter, alpha in itertools.product(ranks, lambdas, numIters, alphas):
-        # Build model
-        model = ALS.trainImplicit(training, rank, numIter, lmbda, alpha=alpha)
-        validationRmse = computeRmse(model, validation, numValidation)
-        print("RMSE (validation) = {0:f} for the model trained with rank = {1:d}, lambda = {2:.1f}, and numIter = {3:d}.".format(validationRmse, rank, lmbda, numIter))
-        if (validationRmse < bestValidationRmse):
-            bestModel = model
-            bestValidationRmse = validationRmse
-            bestRank = rank
-            bestLambda = lmbda
-            bestNumIter = numIter
+    model = ALS.trainImplicit(training, 10, 15, 1.0, alpha=0.01)
+    testRmse = computeRmse(model, test, numTest)
+    print("test Rmse: {0}".format(testRmse))
+    # for rank, lmbda, numIter, alpha in itertools.product(ranks, lambdas, numIters, alphas):
+    #     # Build model
+    #     model = ALS.trainImplicit(training, rank, numIter, lmbda, alpha=alpha)
+    #     validationRmse = computeRmse(model, validation, numValidation)
+    #     print("RMSE (validation) = {0:f} for the model trained with rank = {1:d}, lambda = {2:.1f}, and numIter = {3:d}.".format(validationRmse, rank, lmbda, numIter))
+    #     if (validationRmse < bestValidationRmse):
+    #         bestModel = model
+    #         bestValidationRmse = validationRmse
+    #         bestRank = rank
+    #         bestLambda = lmbda
+    #         bestNumIter = numIter
 
-    testRmse = computeRmse(bestModel, test, numTest)
+    # testRmse = computeRmse(bestModel, test, numTest)
 
     # evaluate the best model on the test set
-    print("The best model was trained with rank = {0:d} and lambda = {1:.1f}, and numIter = {2:d}, and its RMSE on the test set is {3:f}.".format(bestRank, bestLambda, bestNumIter, testRmse))
+    # print("The best model was trained with rank = {0:d} and lambda = {1:.1f}, and numIter = {2:d}, and its RMSE on the test set is {3:f}.".format(bestRank, bestLambda, bestNumIter, testRmse))
 
     # compare the best model with a naive baseline that always returns the mean rating
-    meanRating = training.union(validation).map(lambda x: x[2]).mean()
-    baselineRmse = sqrt(test.map(lambda x: (meanRating - x[2]) ** 2).reduce(add) / numTest)
-    improvement = (baselineRmse - testRmse) / baselineRmse * 100
-    print("The best model improves the baseline by {0:.2f}%.".format(improvement))
+    # meanRating = training.union(validation).map(lambda x: x[2]).mean()
+    # baselineRmse = sqrt(test.map(lambda x: (meanRating - x[2]) ** 2).reduce(add) / numTest)
+    # improvement = (baselineRmse - testRmse) / baselineRmse * 100
+    # print("The best model improves the baseline by {0:.2f}%.".format(improvement))
 
 
     # # Save and load model

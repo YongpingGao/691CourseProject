@@ -1,0 +1,13 @@
+Training: 42, validation: 21, test: 12
+------------------------------------------------------------------------------------------
+XXXXXXX
+[Rating(user=8, product=8, rating=0.5272456186332699), Rating(user=8, product=8, rating=0.5272456186332699), Rating(user=8, product=8, rating=0.5272456186332699), Rating(user=8, product=8, rating=0.5272456186332699), Rating(user=8, product=8, rating=0.5272456186332699), Rating(user=8, product=8, rating=0.5272456186332699), Rating(user=8, product=8, rating=0.5272456186332699), Rating(user=1, product=2, rating=0.2029136279752195), Rating(user=1, product=2, rating=0.2029136279752195), Rating(user=1, product=2, rating=0.2029136279752195), Rating(user=1, product=2, rating=0.2029136279752195), Rating(user=7, product=9, rating=0.1961756034368364)]
+YYYYYYYY
+[('8', '8', 1), ('8', '8', 1), ('8', '8', 1), ('8', '8', 1), ('7', '9', 1), ('1', '2', 4), ('1', '2', 4), ('1', '2', 4), ('1', '2', 4), ('8', '8', 9), ('8', '8', 9), ('8', '8', 9)]
+Traceback (most recent call last):
+  File "/Users/amazin/Desktop/691Project/recom.py", line 141, in <module>
+    testRmse = computeRmse(model, test, numTest)
+  File "/Users/amazin/Desktop/691Project/recom.py", line 70, in computeRmse
+    return sqrt(predictionsAndRatings.map(lambda x: (x[0] - x[1]) ** 2).reduce(add) / float(n))
+  File "/Users/amazin/Google-Drive/WorkStudio/lib/spark-2.1.0-bin-hadoop2.7/python/lib/pyspark.zip/pyspark/rdd.py", line 838, in reduce
+ValueError: Can not reduce() empty RDD

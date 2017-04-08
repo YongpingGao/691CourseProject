@@ -1,0 +1,11 @@
+Training: 29030431, validation: 9673537, test: 9669618
+------------------------------------------------------------------------------------------
+XXXXXXX
+0
+Traceback (most recent call last):
+  File "/Users/amazin/Desktop/691Project/recom.py", line 136, in <module>
+    testRmse = computeRmse(model, test, numTest)
+  File "/Users/amazin/Desktop/691Project/recom.py", line 66, in computeRmse
+    return sqrt(predictionsAndRatings.map(lambda x: (x[0] - x[1]) ** 2).reduce(add) / float(n))
+  File "/Users/amazin/Google-Drive/WorkStudio/lib/spark-2.1.0-bin-hadoop2.7/python/lib/pyspark.zip/pyspark/rdd.py", line 838, in reduce
+ValueError: Can not reduce() empty RDD
