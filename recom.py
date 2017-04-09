@@ -21,7 +21,6 @@ from os.path import join, isfile, dirname
 from pyspark import SparkConf, SparkContext
 from pyspark.mllib.recommendation import ALS, MatrixFactorizationModel
  
-# ((userId, userOldId, songOldId, count), songId)
 # ((0, 'b80344d063b5ccb3212f76538f3d9e43d87dca9e,SODDNQT12A6D4F5F7E,3'), 0), 
 # 0,b80344d063b5ccb3212f76538f3d9e43d87dca9e,SODDNQT12A6D4F5F7E,3,0, 
 def parseRating(line):
@@ -75,17 +74,9 @@ def computeRmse(model, data, n):
     return sqrt(predictionsAndRatings.map(lambda x: (x[0] - x[1]) ** 2).reduce(add) / float(n))
 
 if __name__ == "__main__":
-    # if (len(sys.argv) != 3):
-    #     print("Usage: [usb root directory]/spark/bin/spark-submit --driver-memory 2g " + \
-    #       "recom.py musicDataDir personalRatingsFile")
-    #     sys.exit(1)
-
-    # set up environment
 
     start = timeit.default_timer()
-
-   
-
+    # set up environment
     conf = SparkConf() \
       .setAppName("Music Recommender") \
       .set("spark.executor.memory", "4g") \
@@ -97,28 +88,21 @@ if __name__ == "__main__":
     # myRatingsRDD = sc.parallelize(myRatings, 1)
     
     # load ratings and movie titles
-
     musicDataDir = sys.argv[1]
 
     # ratings is an RDD of ((userId,id), songId, count))
     ratings = sc.textFile(join(musicDataDir, "user_tastes/rating_data/part-00000")).map(parseRating)
 
-    # ratings = sc.textFile(join(musicDataDir, "user_tastes/sub")).map(parseRating)
-    # print(ratings.collect())
     # movies is an RDD of (songId, songTitle)
     # songs = dict(sc.textFile(join(musicDataDir, "unique_tracks.txt")).map(parseSong).collect())
 
-    # print(ratings.collect())
     numRatings = ratings.count()
     numUsers = ratings.map(lambda r: r[0]).distinct().count()
     numSongs = ratings.map(lambda r: r[1]).distinct().count()
-
-
     print ("Got {0} ratings from {1} users on {2} songs.".format(numRatings, numUsers, numSongs))
     print("------------------------------------------------------------------------------------------")
    
-   
-   
+
     # numPartitions = 4
     (training, validation, test) = ratings.randomSplit([0.6, 0.2, 0.2])
     # training = ratings.filter(lambda x: x[0] < 6).repartition(numPartitions).cache()
@@ -143,31 +127,31 @@ if __name__ == "__main__":
     bestLambda = -1.0
     bestNumIter = -1
 
-    model = ALS.trainImplicit(training, 10, 15, 1.0, alpha=0.01)
-    testRmse = computeRmse(model, test, numTest)
-    print("test Rmse: {0}".format(testRmse))
-    # for rank, lmbda, numIter, alpha in itertools.product(ranks, lambdas, numIters, alphas):
-    #     # Build model
-    #     model = ALS.trainImplicit(training, rank, numIter, lmbda, alpha=alpha)
-    #     validationRmse = computeRmse(model, validation, numValidation)
-    #     print("RMSE (validation) = {0:f} for the model trained with rank = {1:d}, lambda = {2:.1f}, and numIter = {3:d}.".format(validationRmse, rank, lmbda, numIter))
-    #     if (validationRmse < bestValidationRmse):
-    #         bestModel = model
-    #         bestValidationRmse = validationRmse
-    #         bestRank = rank
-    #         bestLambda = lmbda
-    #         bestNumIter = numIter
+    # model = ALS.trainImplicit(training, 10, 15, 1.0, alpha=0.01)
+    # testRmse = computeRmse(model, test, numTest)
+    # print("test Rmse: {0}".format(testRmse))
+    for rank, lmbda, numIter, alpha in itertools.product(ranks, lambdas, numIters, alphas):
+        # Build model
+        model = ALS.trainImplicit(training, rank, numIter, lmbda, alpha=alpha)
+        validationRmse = computeRmse(model, validation, numValidation)
+        print("RMSE (validation) = {0:f} for the model trained with rank = {1:d}, lambda = {2:.1f}, and numIter = {3:d}.".format(validationRmse, rank, lmbda, numIter))
+        if (validationRmse < bestValidationRmse):
+            bestModel = model
+            bestValidationRmse = validationRmse
+            bestRank = rank
+            bestLambda = lmbda
+            bestNumIter = numIter
 
-    # testRmse = computeRmse(bestModel, test, numTest)
+    testRmse = computeRmse(bestModel, test, numTest)
 
     # evaluate the best model on the test set
-    # print("The best model was trained with rank = {0:d} and lambda = {1:.1f}, and numIter = {2:d}, and its RMSE on the test set is {3:f}.".format(bestRank, bestLambda, bestNumIter, testRmse))
+    print("The best model was trained with rank = {0:d} and lambda = {1:.1f}, and numIter = {2:d}, and its RMSE on the test set is {3:f}.".format(bestRank, bestLambda, bestNumIter, testRmse))
 
     # compare the best model with a naive baseline that always returns the mean rating
-    # meanRating = training.union(validation).map(lambda x: x[2]).mean()
-    # baselineRmse = sqrt(test.map(lambda x: (meanRating - x[2]) ** 2).reduce(add) / numTest)
-    # improvement = (baselineRmse - testRmse) / baselineRmse * 100
-    # print("The best model improves the baseline by {0:.2f}%.".format(improvement))
+    meanRating = training.union(validation).map(lambda x: x[2]).mean()
+    baselineRmse = sqrt(test.map(lambda x: (meanRating - x[2]) ** 2).reduce(add) / numTest)
+    improvement = (baselineRmse - testRmse) / baselineRmse * 100
+    print("The best model improves the baseline by {0:.2f}%.".format(improvement))
 
 
     # # Save and load model
