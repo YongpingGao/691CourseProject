@@ -10,16 +10,10 @@
 # unique_tracks.txt
 # track id <SEP> song id<SEP>artist name<SEP>song title
 # TRMMMRZ128F4265EB4<SEP>SOEEHEY12CF5F88FB4<SEP>Aerosmith<SEP>I'm Ready
-import sys
-import timeit
-import itertools
-import hashlib
-from math import sqrt
-from operator import add
-from os.path import join, isfile, dirname
 
+
+from os.path import join, isfile, dirname
 from pyspark import SparkConf, SparkContext
-from pyspark.mllib.recommendation import ALS, MatrixFactorizationModel
 
 # line: 
 # b80344d063b5ccb3212f76538f3d9e43d87dca9e,SODDNQT12A6D4F5F7E,5
